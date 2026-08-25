@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Tracker</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 20px 32px;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    header p {
+      margin-top: 4px;
+      font-size: 0.875rem;
+      color: #a0aec0;
+    }
+
+    /* ── Board layout ── */
+    .board {
+      display: flex;
+      gap: 20px;
+      padding: 28px 32px;
+      align-items: flex-start;
+      overflow-x: auto;
+    }
+
+    /* ── Column ── */
+    .column {
+      flex: 1;
+      min-width: 280px;
+      max-width: 360px;
+      background: #e8eaf0;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .column-header h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .badge {
+      background: #c8ccd8;
+      color: #4a5568;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    /* Column accent colours */
+    .column[data-status="ToDo"]        .column-header h2 { color: #4a5568; }
+    .column[data-status="InProgress"]  .column-header h2 { color: #2b6cb0; }
+    .column[data-status="Done"]        .column-header h2 { color: #276749; }
+
+    .column[data-status="InProgress"] { background: #e8f0fb; }
+    .column[data-status="Done"]       { background: #e8f5ee; }
+
+    /* ── Cards ── */
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      border-left: 4px solid transparent;
+    }
+
+    /* Priority border colours */
+    .card[data-priority="High"]   { border-left-color: #e53e3e; }
+    .card[data-priority="Medium"] { border-left-color: #dd6b20; }
+    .card[data-priority="Low"]    { border-left-color: #38a169; }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .card-desc {
+      font-size: 0.82rem;
+      color: #718096;
+      line-height: 1.45;
+      margin-bottom: 10px;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .priority-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .priority-tag.High   { background: #fff5f5; color: #c53030; }
+    .priority-tag.Medium { background: #fffaf0; color: #c05621; }
+    .priority-tag.Low    { background: #f0fff4; color: #276749; }
+
+    .assignee {
+      font-size: 0.78rem;
+      color: #718096;
+    }
+
+    .btn-edit {
+      margin-left: auto;
+      font-size: 0.78rem;
+      padding: 4px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      color: #4a5568;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn-edit:hover {
+      background: #edf2f7;
+      border-color: #a0aec0;
+    }
+
+    /* ── Board-level overlay (loading / error) ── */
+    .board-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      background: rgba(240, 242, 245, 0.85);
+      border-radius: 12px;
+      z-index: 10;
+    }
+
+    .board-overlay.visible { display: flex; }
+
+    .board { position: relative; }
+
+    /* Loading spinner */
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 4px solid #cbd5e0;
+      border-top-color: #2b6cb0;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error banner */
+    .board-error {
+      background: #fff5f5;
+      border: 1px solid #feb2b2;
+      border-radius: 10px;
+      padding: 20px 28px;
+      text-align: center;
+      color: #c53030;
+    }
+
+    .board-error p { font-size: 0.9rem; margin-bottom: 12px; }
+
+    .btn-retry {
+      font-size: 0.82rem;
+      padding: 6px 16px;
+      border: 1px solid #fc8181;
+      border-radius: 6px;
+      background: #fff;
+      color: #c53030;
+      cursor: pointer;
+    }
+
+    .btn-retry:hover { background: #fff5f5; }
+
+    /* Empty-column placeholder */
+    .empty-placeholder {
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #a0aec0;
+      border: 2px dashed #cbd5e0;
+      border-radius: 8px;
+    }
+
+    /* ── Drag-and-drop ── */
+    .card[draggable="true"] { cursor: grab; }
+    .card[draggable="true"]:active { cursor: grabbing; }
+
+    .card.dragging {
+      opacity: 0.4;
+      box-shadow: none;
+    }
+
+    .column.drag-over {
+      outline: 2px dashed #2b6cb0;
+      outline-offset: -3px;
+    }
+
+    /* ── Toast (transient error) ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: #fff;
+      font-size: 0.85rem;
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.2);
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.visible { opacity: 1; }
+
+    /* ── Header: New Task button ── */
+    .btn-new-task {
+      margin-top: 12px;
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 7px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-new-task:hover { background: rgba(255,255,255,0.1); }
+
+    /* ── Modal backdrop ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    /* ── Modal card ── */
+    .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-header h3 { font-size: 1rem; font-weight: 700; }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      color: #718096;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .modal-close:hover { background: #edf2f7; color: #1a1a2e; }
+
+    /* ── Form layout ── */
+    #task-form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+
+    #task-form label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4a5568;
+    }
+
+    #task-form input,
+    #task-form select,
+    #task-form textarea {
+      padding: 8px 10px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      font-size: 0.87rem;
+      font-family: inherit;
+      color: #1a1a2e;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+
+    #task-form input:focus,
+    #task-form select:focus,
+    #task-form textarea:focus {
+      outline: none;
+      border-color: #2b6cb0;
+    }
+
+    #task-form input.invalid,
+    #task-form textarea.invalid { border-color: #e53e3e; }
+
+    #task-form textarea { resize: vertical; min-height: 72px; }
+
+    .field-error {
+      font-size: 0.75rem;
+      color: #c53030;
+      min-height: 16px;
+    }
+
+    .form-error {
+      background: #fff5f5;
+      border: 1px solid #feb2b2;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      color: #c53030;
+    }
+
+    /* ── Modal action buttons ── */
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 4px;
+    }
+
+    .btn-cancel {
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      background: #fff;
+      color: #4a5568;
+      cursor: pointer;
+    }
+    .btn-cancel:hover { background: #edf2f7; }
+
+    .btn-submit {
+      padding: 7px 18px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      background: #2b6cb0;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-submit:hover { background: #2c5282; }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <div id="toast" class="toast" aria-live="assertive"></div>
+
+  <header>
+    <h1>Task Tracker</h1>
+    <p>Manage and track your team's work across stages.</p>
+    <button class="btn-new-task" onclick="openModal()">+ New Task</button>
+  </header>
+
+  <main class="board">
+
+    <!-- Board-level overlay: shown during loading or on error -->
+    <div id="board-overlay" class="board-overlay" aria-live="polite"></div>
+
+
+    <!-- ── To Do ── -->
+    <section class="column" data-status="ToDo">
+      <div class="column-header">
+        <h2>To Do</h2>
+        <span class="badge">0</span>
+      </div>
+      <div class="cards"></div>
+    </section>
+
+    <!-- ── In Progress ── -->
+    <section class="column" data-status="InProgress">
+      <div class="column-header">
+        <h2>In Progress</h2>
+        <span class="badge">0</span>
+      </div>
+      <div class="cards"></div>
+    </section>
+
+    <!-- ── Done ── -->
+    <section class="column" data-status="Done">
+      <div class="column-header">
+        <h2>Done</h2>
+        <span class="badge">0</span>
+      </div>
+      <div class="cards"></div>
+    </section>
+
+  </main>
+
+  <!-- ── Create / Edit modal ── -->
+  <div id="modal-backdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">New Task</h3>
+        <button class="modal-close" aria-label="Close" onclick="closeModal()">✕</button>
+      </div>
+      <form id="task-form" novalidate>
+        <input type="hidden" id="field-id" />
+
+        <div class="form-group">
+          <label for="field-title">Title *</label>
+          <input type="text" id="field-title" placeholder="Task title" autocomplete="off" />
+          <span class="field-error" id="error-title"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="field-desc">Description</label>
+          <textarea id="field-desc" placeholder="Optional details"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="field-status">Status</label>
+            <select id="field-status">
+              <option value="ToDo">To Do</option>
+              <option value="InProgress">In Progress</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="field-priority">Priority</label>
+            <select id="field-priority">
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="field-assignee">Assignee</label>
+          <input type="text" id="field-assignee" placeholder="Leave blank for Unassigned" autocomplete="off" />
+        </div>
+
+        <div id="form-error" class="form-error" hidden></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn-submit" id="btn-submit">Create Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:8000';
+    const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+    let tasks = [];
+
+    const overlay = document.getElementById('board-overlay');
+
+    // ── Overlay helpers ────────────────────────────────────────────
+
+    function showLoading() {
+      overlay.innerHTML = '<div class="spinner"></div>';
+      overlay.classList.add('visible');
+    }
+
+    function showError(message) {
+      overlay.innerHTML = `
+        <div class="board-error">
+          <p>${escape(message)}</p>
+          <button class="btn-retry" onclick="fetchTasks()">Retry</button>
+        </div>`;
+      overlay.classList.add('visible');
+    }
+
+    function hideOverlay() {
+      overlay.classList.remove('visible');
+      overlay.innerHTML = '';
+    }
+
+    // ── DOM helpers ────────────────────────────────────────────────
+
+    function escape(str) {
+      const el = document.createElement('span');
+      el.textContent = str ?? '';
+      return el.innerHTML;
+    }
+
+    function buildCard(task) {
+      const priority = escape(task.priority ?? 'Low');
+      const title    = escape(task.title    ?? '(untitled)');
+      const desc     = task.description
+        ? `<div class="card-desc">${escape(task.description)}</div>`
+        : '';
+      const assignee = escape(task.assignee ?? 'Unassigned');
+
+      return `
+        <article class="card" draggable="true" data-id="${task.id}" data-priority="${priority}">
+          <div class="card-title">${title}</div>
+          ${desc}
+          <div class="card-meta">
+            <span class="priority-tag ${priority}">${priority}</span>
+            <span class="assignee">${assignee}</span>
+            <button class="btn-edit">Edit</button>
+          </div>
+        </article>`.trim();
+    }
+
+    // ── Render ─────────────────────────────────────────────────────
+
+    function renderBoard(tasks) {
+      document.querySelectorAll('.column').forEach(col => {
+        const status  = col.dataset.status;
+        const cardsEl = col.querySelector('.cards');
+        const badgeEl = col.querySelector('.badge');
+
+        const colTasks = tasks
+          .filter(t => t.status === status)
+          .sort((a, b) => {
+            const pd = (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+            return pd !== 0 ? pd : a.id - b.id;
+          });
+
+        badgeEl.textContent = colTasks.length;
+
+        if (colTasks.length === 0) {
+          cardsEl.innerHTML = '<div class="empty-placeholder">No tasks here</div>';
+        } else {
+          cardsEl.innerHTML = colTasks.map(buildCard).join('');
+        }
+      });
+
+      attachDragListeners();
+    }
+
+    // ── Drag-and-drop ──────────────────────────────────────────────
+
+    let draggedId = null;
+    let toastTimer = null;
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
+    }
+
+    function attachDragListeners() {
+      document.querySelectorAll('.card[draggable]').forEach(card => {
+        card.addEventListener('dragstart', e => {
+          draggedId = card.dataset.id;
+          e.dataTransfer.effectAllowed = 'move';
+          // Defer so the browser snapshot is taken before the class is applied.
+          requestAnimationFrame(() => card.classList.add('dragging'));
+        });
+
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+        });
+      });
+
+      document.querySelectorAll('.column').forEach(col => {
+        col.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          col.classList.add('drag-over');
+        });
+
+        col.addEventListener('dragleave', e => {
+          if (!col.contains(e.relatedTarget)) {
+            col.classList.remove('drag-over');
+          }
+        });
+
+        col.addEventListener('drop', e => {
+          e.preventDefault();
+          col.classList.remove('drag-over');
+          if (draggedId) {
+            handleDrop(draggedId, col.dataset.status);
+            draggedId = null;
+          }
+        });
+      });
+    }
+
+    async function handleDrop(taskId, targetStatus) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || task.status === targetStatus) return;
+
+      const previousStatus = task.status;
+
+      // Optimistic update — move card immediately.
+      task.status = targetStatus;
+      renderBoard(tasks);
+
+      try {
+        const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: targetStatus }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          const idx = tasks.findIndex(t => t.id === taskId);
+          if (idx !== -1) tasks[idx] = updated;
+          renderBoard(tasks);
+        } else {
+          const body = await res.json().catch(() => ({}));
+          const msg = body.detail || `Move rejected (HTTP ${res.status})`;
+          task.status = previousStatus;
+          renderBoard(tasks);
+          showToast(msg);
+        }
+      } catch {
+        task.status = previousStatus;
+        renderBoard(tasks);
+        showToast('Network error — move was not saved.');
+      }
+    }
+
+    // ── Modal ──────────────────────────────────────────────────────
+
+    const backdrop   = document.getElementById('modal-backdrop');
+    const modalTitle = document.getElementById('modal-title');
+    const btnSubmit  = document.getElementById('btn-submit');
+    const taskForm   = document.getElementById('task-form');
+
+    const fId       = document.getElementById('field-id');
+    const fTitle    = document.getElementById('field-title');
+    const fDesc     = document.getElementById('field-desc');
+    const fStatus   = document.getElementById('field-status');
+    const fPriority = document.getElementById('field-priority');
+    const fAssignee = document.getElementById('field-assignee');
+    const errTitle  = document.getElementById('error-title');
+    const formError = document.getElementById('form-error');
+
+    function openModal(task) {
+      clearModalErrors();
+      if (task) {
+        modalTitle.textContent  = 'Edit Task';
+        btnSubmit.textContent   = 'Save Changes';
+        fId.value               = task.id;
+        fTitle.value            = task.title;
+        fDesc.value             = task.description ?? '';
+        fStatus.value           = task.status;
+        fPriority.value         = task.priority;
+        fAssignee.value         = task.assignee ?? '';
+      } else {
+        modalTitle.textContent  = 'New Task';
+        btnSubmit.textContent   = 'Create Task';
+        fId.value               = '';
+        taskForm.reset();
+        fPriority.value         = 'Medium';
+      }
+      backdrop.classList.add('open');
+      fTitle.focus();
+    }
+
+    function closeModal() {
+      backdrop.classList.remove('open');
+      clearModalErrors();
+    }
+
+    function clearModalErrors() {
+      errTitle.textContent = '';
+      fTitle.classList.remove('invalid');
+      formError.hidden = true;
+      formError.textContent = '';
+      btnSubmit.disabled = false;
+    }
+
+    function showFormError(msg) {
+      formError.textContent = msg;
+      formError.hidden = false;
+    }
+
+    taskForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      clearModalErrors();
+
+      const title = fTitle.value.trim();
+      if (!title) {
+        errTitle.textContent = 'Title is required';
+        fTitle.classList.add('invalid');
+        fTitle.focus();
+        return;
+      }
+
+      const id       = fId.value;
+      const isEdit   = Boolean(id);
+      const newStatus = fStatus.value;
+
+      const payload  = {
+        title,
+        description: fDesc.value.trim(),
+        priority:    fPriority.value,
+        assignee:    fAssignee.value.trim() || null,
+      };
+
+      // Only send status when it actually changed — the backend rejects same-status transitions.
+      if (!isEdit) {
+        payload.status = newStatus;
+      } else {
+        const existing = tasks.find(t => t.id === id);
+        if (existing && existing.status !== newStatus) {
+          payload.status = newStatus;
+        }
+      }
+
+      btnSubmit.disabled = true;
+
+      try {
+        const url    = isEdit ? `${API_BASE}/tasks/${id}` : `${API_BASE}/tasks`;
+        const method = isEdit ? 'PATCH' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          closeModal();
+          await fetchTasks();
+        } else {
+          const body = await res.json().catch(() => ({}));
+          const msg  = typeof body.detail === 'string'
+            ? body.detail
+            : JSON.stringify(body.detail) || `Server error (HTTP ${res.status})`;
+          showFormError(msg);
+          btnSubmit.disabled = false;
+        }
+      } catch {
+        showFormError('Network error — could not reach the server.');
+        btnSubmit.disabled = false;
+      }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
+    });
+
+    // Close on backdrop click (not modal card click)
+    backdrop.addEventListener('click', e => {
+      if (e.target === backdrop) closeModal();
+    });
+
+    // Edit button delegation — wired once, survives re-renders
+    document.querySelector('.board').addEventListener('click', e => {
+      const btn = e.target.closest('.btn-edit');
+      if (!btn) return;
+      const card = btn.closest('.card');
+      const task = tasks.find(t => t.id === card?.dataset.id);
+      if (task) openModal(task);
+    });
+
+    // ── Fetch ──────────────────────────────────────────────────────
+
+    async function fetchTasks() {
+      showLoading();
+      try {
+        const res = await fetch(`${API_BASE}/tasks`);
+        if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
+        tasks = await res.json();
+        hideOverlay();
+        renderBoard(tasks);
+      } catch (err) {
+        console.error('Failed to load tasks:', err);
+        showError(err.message || 'Could not load tasks. Check the server is running.');
+      }
+    }
+
+    fetchTasks();
+  </script>
+
+</body>
+</html>
