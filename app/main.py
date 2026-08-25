@@ -1,7 +1,6 @@
 # Entry point: creates the FastAPI application instance and registers global routes
 import os
 from datetime import datetime, timezone
-
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -30,13 +29,13 @@ app.add_middleware(
 
 def _seed_dummy_data() -> None:
     dummy = [
-        TaskCreate(title="Design database schema",      description="Define tables, relationships, and indexes.",          status=TaskStatus.TODO,        priority=TaskPriority.HIGH,   assignee=None),
-        TaskCreate(title="Write API documentation",     description="Document all endpoints using OpenAPI comments.",      status=TaskStatus.TODO,        priority=TaskPriority.MEDIUM, assignee="Carol"),
-        TaskCreate(title="Add input validation",        description="Use Pydantic validators on all request bodies.",      status=TaskStatus.TODO,        priority=TaskPriority.LOW,    assignee=None),
-        TaskCreate(title="Build REST API endpoints",    description="Implement CRUD routes for tasks with FastAPI.",       status=TaskStatus.IN_PROGRESS, priority=TaskPriority.HIGH,   assignee="Alice"),
-        TaskCreate(title="Integrate frontend fetch",    description="Connect board UI to GET /tasks and render cards.",    status=TaskStatus.IN_PROGRESS, priority=TaskPriority.MEDIUM, assignee="Bob"),
-        TaskCreate(title="Set up project structure",    description="Scaffold folders, venv, requirements, and Makefile.", status=TaskStatus.DONE,        priority=TaskPriority.LOW,    assignee="Bob"),
-        TaskCreate(title="Configure CORS middleware",   description="Allow frontend origin in FastAPI middleware.",         status=TaskStatus.DONE,        priority=TaskPriority.MEDIUM, assignee="Alice"),
+        TaskCreate(title="Design database schema",     description="Define tables, relationships, and indexes.",          status=TaskStatus.TODO,        priority=TaskPriority.HIGH,   assignee=None,    tags=["backend", "database"]),
+        TaskCreate(title="Write API documentation",    description="Document all endpoints using OpenAPI comments.",      status=TaskStatus.TODO,        priority=TaskPriority.MEDIUM, assignee="Carol",  tags=["docs"]),
+        TaskCreate(title="Add input validation",       description="Use Pydantic validators on all request bodies.",      status=TaskStatus.TODO,        priority=TaskPriority.LOW,    assignee=None,    tags=["backend", "validation"]),
+        TaskCreate(title="Build REST API endpoints",   description="Implement CRUD routes for tasks with FastAPI.",       status=TaskStatus.IN_PROGRESS, priority=TaskPriority.HIGH,   assignee="Alice",  tags=["backend", "api"]),
+        TaskCreate(title="Integrate frontend fetch",   description="Connect board UI to GET /tasks and render cards.",    status=TaskStatus.IN_PROGRESS, priority=TaskPriority.MEDIUM, assignee="Bob",    tags=["frontend"]),
+        TaskCreate(title="Set up project structure",   description="Scaffold folders, venv, requirements, and Makefile.", status=TaskStatus.DONE,        priority=TaskPriority.LOW,    assignee="Bob",    tags=["devops"]),
+        TaskCreate(title="Configure CORS middleware",  description="Allow frontend origin in FastAPI middleware.",         status=TaskStatus.DONE,        priority=TaskPriority.MEDIUM, assignee="Alice",  tags=["backend", "security"]),
     ]
     for task in dummy:
         storage.add_task(task)
@@ -48,8 +47,11 @@ _seed_dummy_data()
 def list_tasks(
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None,
+    q: Optional[str] = None,
+    tag: Optional[str] = None,
+    assignee: Optional[str] = None,
 ) -> list[TaskResponse]:
-    return storage.get_all_tasks(status=status, priority=priority)
+    return storage.get_all_tasks(status=status, priority=priority, q=q, tag=tag, assignee=assignee)
 
 
 @app.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED, tags=["tasks"])

@@ -256,6 +256,66 @@
 
     .toast.visible { opacity: 1; }
 
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 32px;
+      background: #f7f8fa;
+      border-bottom: 1px solid #e2e8f0;
+      align-items: center;
+    }
+
+    .filter-bar input,
+    .filter-bar select {
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      background: #fff;
+      color: #1a1a2e;
+      font-family: inherit;
+    }
+
+    .filter-bar input { min-width: 200px; }
+    .filter-bar select { min-width: 130px; }
+
+    .filter-bar input:focus,
+    .filter-bar select:focus {
+      outline: 2px solid #2b6cb0;
+      outline-offset: 1px;
+    }
+
+    .btn-clear-filters {
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      background: #fff;
+      color: #4a5568;
+      cursor: pointer;
+    }
+    .btn-clear-filters:hover { background: #edf2f7; }
+
+    /* ── Tag chips on cards ── */
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .tag-chip {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #ebf4ff;
+      color: #2b6cb0;
+      letter-spacing: 0.2px;
+    }
+
     /* ── Header: New Task button ── */
     .btn-new-task {
       margin-top: 12px;
@@ -414,6 +474,24 @@
     <button class="btn-new-task" onclick="openModal()">+ New Task</button>
   </header>
 
+  <div class="filter-bar">
+    <input type="search" id="filter-q" placeholder="Search title or description…" aria-label="Search tasks" />
+    <select id="filter-status" aria-label="Filter by status">
+      <option value="">All Statuses</option>
+      <option value="ToDo">To Do</option>
+      <option value="InProgress">In Progress</option>
+      <option value="Done">Done</option>
+    </select>
+    <select id="filter-priority" aria-label="Filter by priority">
+      <option value="">All Priorities</option>
+      <option value="High">High</option>
+      <option value="Medium">Medium</option>
+      <option value="Low">Low</option>
+    </select>
+    <input type="text" id="filter-tag" placeholder="Filter by tag…" aria-label="Filter by tag" />
+    <button type="button" class="btn-clear-filters" id="btn-clear-filters">Clear</button>
+  </div>
+
   <main class="board">
 
     <!-- Board-level overlay: shown during loading or on error -->
@@ -494,6 +572,12 @@
           <input type="text" id="field-assignee" placeholder="Leave blank for Unassigned" autocomplete="off" />
         </div>
 
+        <div class="form-group">
+          <label for="field-tags">Tags</label>
+          <input type="text" id="field-tags" placeholder="e.g. frontend, bug, backend" autocomplete="off" />
+          <span class="field-error" id="error-tags"></span>
+        </div>
+
         <div id="form-error" class="form-error" hidden></div>
 
         <div class="modal-actions">
@@ -510,12 +594,23 @@
 
     let tasks = [];
 
-    const overlay = document.getElementById('board-overlay');
+    // ── Active filters ─────────────────────────────────────────────
+    const currentFilters = { q: '', status: '', priority: '', tag: '' };
+
+    function buildQueryString() {
+      const params = new URLSearchParams();
+      if (currentFilters.q)        params.set('q',        currentFilters.q);
+      if (currentFilters.status)   params.set('status',   currentFilters.status);
+      if (currentFilters.priority) params.set('priority', currentFilters.priority);
+      if (currentFilters.tag)      params.set('tag',      currentFilters.tag);
+      return params.toString();
+    }
 
     // ── Overlay helpers ────────────────────────────────────────────
+    const overlay = document.getElementById('board-overlay');
 
     function showLoading() {
-      overlay.innerHTML = '<div class="spinner"></div>';
+      overlay.innerHTML = '<div class="spinner" role="status" aria-label="Loading tasks"></div>';
       overlay.classList.add('visible');
     }
 
@@ -548,11 +643,15 @@
         ? `<div class="card-desc">${escape(task.description)}</div>`
         : '';
       const assignee = escape(task.assignee ?? 'Unassigned');
+      const tagsHtml = (task.tags && task.tags.length > 0)
+        ? `<div class="card-tags">${task.tags.map(t => `<span class="tag-chip">${escape(t)}</span>`).join('')}</div>`
+        : '';
 
       return `
         <article class="card" draggable="true" data-id="${task.id}" data-priority="${priority}">
           <div class="card-title">${title}</div>
           ${desc}
+          ${tagsHtml}
           <div class="card-meta">
             <span class="priority-tag ${priority}">${priority}</span>
             <span class="assignee">${assignee}</span>
@@ -606,7 +705,6 @@
         card.addEventListener('dragstart', e => {
           draggedId = card.dataset.id;
           e.dataTransfer.effectAllowed = 'move';
-          // Defer so the browser snapshot is taken before the class is applied.
           requestAnimationFrame(() => card.classList.add('dragging'));
         });
 
@@ -644,8 +742,6 @@
       if (!task || task.status === targetStatus) return;
 
       const previousStatus = task.status;
-
-      // Optimistic update — move card immediately.
       task.status = targetStatus;
       renderBoard(tasks);
 
@@ -688,26 +784,30 @@
     const fStatus   = document.getElementById('field-status');
     const fPriority = document.getElementById('field-priority');
     const fAssignee = document.getElementById('field-assignee');
+    const fTags     = document.getElementById('field-tags');
     const errTitle  = document.getElementById('error-title');
+    const errTags   = document.getElementById('error-tags');
     const formError = document.getElementById('form-error');
 
     function openModal(task) {
       clearModalErrors();
       if (task) {
-        modalTitle.textContent  = 'Edit Task';
-        btnSubmit.textContent   = 'Save Changes';
-        fId.value               = task.id;
-        fTitle.value            = task.title;
-        fDesc.value             = task.description ?? '';
-        fStatus.value           = task.status;
-        fPriority.value         = task.priority;
-        fAssignee.value         = task.assignee ?? '';
+        modalTitle.textContent = 'Edit Task';
+        btnSubmit.textContent  = 'Save Changes';
+        fId.value              = task.id;
+        fTitle.value           = task.title;
+        fDesc.value            = task.description ?? '';
+        fStatus.value          = task.status;
+        fPriority.value        = task.priority;
+        fAssignee.value        = task.assignee ?? '';
+        fTags.value            = (task.tags ?? []).join(', ');
       } else {
-        modalTitle.textContent  = 'New Task';
-        btnSubmit.textContent   = 'Create Task';
-        fId.value               = '';
+        modalTitle.textContent = 'New Task';
+        btnSubmit.textContent  = 'Create Task';
+        fId.value              = '';
         taskForm.reset();
-        fPriority.value         = 'Medium';
+        fPriority.value        = 'Medium';
+        fTags.value            = '';
       }
       backdrop.classList.add('open');
       fTitle.focus();
@@ -721,6 +821,7 @@
     function clearModalErrors() {
       errTitle.textContent = '';
       fTitle.classList.remove('invalid');
+      if (errTags) errTags.textContent = '';
       formError.hidden = true;
       formError.textContent = '';
       btnSubmit.disabled = false;
@@ -729,6 +830,10 @@
     function showFormError(msg) {
       formError.textContent = msg;
       formError.hidden = false;
+    }
+
+    function parseTags(raw) {
+      return raw.split(',').map(t => t.trim()).filter(t => t.length > 0);
     }
 
     taskForm.addEventListener('submit', async e => {
@@ -743,18 +848,19 @@
         return;
       }
 
-      const id       = fId.value;
-      const isEdit   = Boolean(id);
+      const id        = fId.value;
+      const isEdit    = Boolean(id);
       const newStatus = fStatus.value;
+      const tags      = parseTags(fTags.value);
 
-      const payload  = {
+      const payload = {
         title,
         description: fDesc.value.trim(),
         priority:    fPriority.value,
         assignee:    fAssignee.value.trim() || null,
+        tags,
       };
 
-      // Only send status when it actually changed — the backend rejects same-status transitions.
       if (!isEdit) {
         payload.status = newStatus;
       } else {
@@ -793,17 +899,14 @@
       }
     });
 
-    // Close on Escape
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
     });
 
-    // Close on backdrop click (not modal card click)
     backdrop.addEventListener('click', e => {
       if (e.target === backdrop) closeModal();
     });
 
-    // Edit button delegation — wired once, survives re-renders
     document.querySelector('.board').addEventListener('click', e => {
       const btn = e.target.closest('.btn-edit');
       if (!btn) return;
@@ -812,12 +915,45 @@
       if (task) openModal(task);
     });
 
+    // ── Filter bar ─────────────────────────────────────────────────
+
+    let debounceTimer = null;
+
+    function onFilterChange() {
+      currentFilters.q        = document.getElementById('filter-q').value.trim();
+      currentFilters.status   = document.getElementById('filter-status').value;
+      currentFilters.priority = document.getElementById('filter-priority').value;
+      currentFilters.tag      = document.getElementById('filter-tag').value.trim();
+      fetchTasks();
+    }
+
+    function onSearchInput() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(onFilterChange, 300);
+    }
+
+    document.getElementById('filter-q').addEventListener('input', onSearchInput);
+    document.getElementById('filter-tag').addEventListener('input', onSearchInput);
+    document.getElementById('filter-status').addEventListener('change', onFilterChange);
+    document.getElementById('filter-priority').addEventListener('change', onFilterChange);
+
+    document.getElementById('btn-clear-filters').addEventListener('click', () => {
+      currentFilters.q = currentFilters.status = currentFilters.priority = currentFilters.tag = '';
+      document.getElementById('filter-q').value        = '';
+      document.getElementById('filter-status').value   = '';
+      document.getElementById('filter-priority').value = '';
+      document.getElementById('filter-tag').value      = '';
+      fetchTasks();
+    });
+
     // ── Fetch ──────────────────────────────────────────────────────
 
     async function fetchTasks() {
       showLoading();
+      const qs  = buildQueryString();
+      const url = qs ? `${API_BASE}/tasks?${qs}` : `${API_BASE}/tasks`;
       try {
-        const res = await fetch(`${API_BASE}/tasks`);
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
         tasks = await res.json();
         hideOverlay();

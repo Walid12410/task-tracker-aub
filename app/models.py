@@ -31,6 +31,7 @@ class TaskCreate(BaseModel):
     status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
     assignee: Optional[str] = None
+    tags: list[str] = []
 
     @field_validator("title")
     @classmethod
@@ -42,6 +43,21 @@ class TaskCreate(BaseModel):
             raise ValueError("title must not exceed 200 characters")
         return stripped
 
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[str]) -> list[str]:
+        if len(v) > 10:
+            raise ValueError("a task may have at most 10 tags")
+        result = []
+        for tag in v:
+            t = tag.strip()
+            if not t:
+                raise ValueError("tags must not be empty or whitespace-only")
+            if len(t) > 50:
+                raise ValueError("each tag must not exceed 50 characters")
+            result.append(t)
+        return result
+
 
 class TaskUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -51,6 +67,7 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
     assignee: Optional[str] = None
+    tags: Optional[list[str]] = None
 
     @field_validator("title")
     @classmethod
@@ -64,6 +81,23 @@ class TaskUpdate(BaseModel):
             raise ValueError("title must not exceed 200 characters")
         return stripped
 
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return v
+        if len(v) > 10:
+            raise ValueError("a task may have at most 10 tags")
+        result = []
+        for tag in v:
+            t = tag.strip()
+            if not t:
+                raise ValueError("tags must not be empty or whitespace-only")
+            if len(t) > 50:
+                raise ValueError("each tag must not exceed 50 characters")
+            result.append(t)
+        return result
+
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -74,5 +108,6 @@ class TaskResponse(BaseModel):
     status: TaskStatus
     priority: TaskPriority
     assignee: Optional[str]
+    tags: list[str]
     created_at: datetime
     updated_at: datetime
