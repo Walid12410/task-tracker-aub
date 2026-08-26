@@ -2,9 +2,15 @@
 
 ## AI tools used and how
 
-I used Claude (claude-sonnet) throughout this project as a coding assistant. My workflow was prompt → inspect output → run tests → accept, edit, or reject before moving on. I never pasted AI output directly into the codebase without reading it first.
+I used three AI tools across this project: **Cursor**, **ChatGPT**, and **Claude**.
 
-For the backend work I used targeted prompts: one per layer (model, storage, route, tests). For the frontend I wrote one prompt per component (filter bar, tag chips, modal field). For documentation I wrote the content myself based on actual decisions made during implementation, using AI only to help structure the markdown.
+- **Cursor** was my primary coding environment. I used its inline chat to generate and edit code directly in the editor, which made it easy to iterate on small changes without leaving the file I was working in. I used it most heavily for the backend model and storage changes.
+- **ChatGPT** helped me plan and think through design decisions before writing code — particularly for the tags data model (list vs. string) and the filter combination logic. I treated it as a sounding board rather than a code generator.
+- **Claude** was used for generating larger code blocks and test cases, and for structuring the documentation files.
+
+My workflow across all three tools was the same: prompt → read the output carefully → run the tests → accept, edit, or reject before committing anything. I never pasted AI output into the codebase without reviewing it first.
+
+For the backend I used one prompt per layer (model, storage, route, tests). For the frontend I wrote one prompt per component (filter bar, tag chips, modal field). Documentation was written by me based on real decisions made during implementation.
 
 ## One moment AI genuinely helped
 
