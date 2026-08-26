@@ -1,63 +1,151 @@
-# Task Tracker
+# Task Tracker API
 
-A learning project that demonstrates REST API design with Python and FastAPI, featuring a JSON file backend and a vanilla JavaScript frontend.
-The project covers FastAPI routing, Pydantic validation, layered architecture, and automated testing — without requiring a database server.
+A REST API for managing tasks, built with Python and FastAPI. Features a JSON-backed in-memory store, a vanilla JavaScript Kanban board frontend, and a full pytest suite. Containerized with Docker and continuously verified by GitHub Actions.
 
-## Setup
+## Architecture
 
-### 1. Create a virtual environment
+```
+task-tracker-api/
+├── app/
+│   ├── main.py            # FastAPI app, route definitions, CORS
+│   ├── models.py          # Pydantic request/response models
+│   ├── storage.py         # In-memory task store (dict + uuid)
+│   ├── business_rules.py  # Status transition validation
+│   └── routers/           # Router module (prefix /tasks)
+├── frontend/
+│   └── index.html         # Vanilla JS Kanban board
+├── tests/
+│   ├── conftest.py        # Shared fixtures (TestClient, storage reset)
+│   └── test_tasks.py      # Full route coverage (CRUD + tags + search)
+├── docs/
+│   ├── midcourse/         # Mid-course design docs
+│   └── final/             # Final-project docs (ADR, security, reflection)
+├── Dockerfile
+├── docker-compose.yml
+├── .github/workflows/ci.yml
+├── AGENTS.md              # AI governance log
+└── requirements.txt
+```
+
+## Quick Start (Docker)
 
 ```bash
-cd task-tracker/backend
+docker compose up
+```
+
+- API: http://localhost:8000
+- Interactive docs: http://localhost:8000/docs
+- Frontend: http://localhost:5500
+
+## Quick Start (local)
+
+```bash
 python -m venv venv
-source venv/bin/activate        # macOS / Linux
-# venv\Scripts\activate         # Windows PowerShell
-```
-
-### 2. Install dependencies
-
-```bash
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-### 3. Configure environment variables
-
-```bash
-cp ../.env.example .env
-```
-
-### 4. Start the backend server
-
-```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-The API will be available at `http://localhost:8000`.
-Interactive docs are at `http://localhost:8000/docs`.
-
-### 5. Test the health endpoint
+Serve the frontend in a second terminal:
 
 ```bash
-curl http://localhost:8000/health
+python -m http.server 5500 --directory frontend
 ```
 
-Expected response:
+Open http://localhost:5500.
+
+## Environment Variables
+
+Copy `.env.example` to `.env` before running locally:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8000` | Port uvicorn listens on |
+| `APP_ENV` | `development` | Runtime environment label |
+
+## API Reference
+
+### Health
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Returns `{"status":"ok","timestamp":"..."}` |
+
+### Tasks
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/tasks` | List tasks (filterable) |
+| `POST` | `/tasks` | Create a task |
+| `GET` | `/tasks/{id}` | Get a single task |
+| `PATCH` | `/tasks/{id}` | Partial update |
+| `DELETE` | `/tasks/{id}` | Delete a task |
+
+#### Filter parameters for `GET /tasks`
+
+| Parameter | Type | Example |
+|-----------|------|---------|
+| `status` | `ToDo` \| `InProgress` \| `Done` | `?status=InProgress` |
+| `priority` | `Low` \| `Medium` \| `High` | `?priority=High` |
+| `q` | string | `?q=login` (searches title + description) |
+| `tag` | string | `?tag=backend` (case-insensitive) |
+| `assignee` | string | `?assignee=Alice` |
+
+#### Task object
 
 ```json
-{"status": "ok", "timestamp": "2026-07-26T10:00:00.000000+00:00"}
+{
+  "id": "uuid",
+  "title": "string (1–200 chars)",
+  "description": "string",
+  "status": "ToDo | InProgress | Done",
+  "priority": "Low | Medium | High",
+  "assignee": "string | null",
+  "tags": ["string"],
+  "created_at": "ISO 8601",
+  "updated_at": "ISO 8601"
+}
 ```
 
-### 6. Run the test suite
+#### Status transitions
+
+Only these moves are allowed via `PATCH`:
+
+- `ToDo → InProgress`
+- `InProgress → Done`
+- `Done → InProgress`
+
+Any other transition returns `422 Unprocessable Entity`.
+
+## Running Tests
 
 ```bash
 pytest tests/ -v
 ```
 
-### 7. Start the frontend (separate terminal)
+All tests use an isolated in-memory store that resets between each test via the `_reset_storage` autouse fixture.
 
-```bash
-cd task-tracker/frontend
-python -m http.server 5500
-```
+## CI
 
-Open `http://localhost:5500` in your browser.
+GitHub Actions runs on every push:
+
+1. **test** — installs Python 3.11, runs `pytest tests/ -v`
+2. **docker** — builds the image and smoke-tests `GET /health`
+
+See `.github/workflows/ci.yml`.
+
+## AI Governance
+
+All AI tool usage is documented in `AGENTS.md`. Every AI-generated output was reviewed line-by-line and tested before commit. No AI output was committed without passing the full test suite.
+
+## Known Limitations
+
+- Storage is in-memory only — data is lost on restart and not suitable for multi-process deployment.
+- No authentication or authorization.
+- CORS is hard-coded to `http://localhost:5500`. Change `allow_origins` in `app/main.py` for other environments.
+- No rate limiting.
+- `description` field has no server-side length cap (only `title` is length-validated).
