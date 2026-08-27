@@ -1,10 +1,12 @@
 # Final AI Review — Task Tracker API
 
-This document contains four sections required for the final-project checkpoint:
+This document contains six sections required for the final-project checkpoint:
 1. Graded AI Code Review Mini-Log
 2. Graded AI Security Mini-Review
 3. Standalone Manual Check
 4. Rejected-Output Example
+5. Three AI Usage Rules
+6. Ownership Statement
 
 ---
 
@@ -142,3 +144,46 @@ if q:
 ```
 
 This is shorter, has no import, cannot throw `re.error`, and reads exactly as the requirement states. This is the version in the current `app/storage.py`.
+
+---
+
+## Three AI Usage Rules
+
+These three rules govern every AI interaction on this project. They are not aspirational — they were applied to every prompt in the mid-course and final phases.
+
+**Rule 1: Read every line of AI output before committing it.**
+
+No AI-generated file, function, or suggestion is accepted without being read in full by me. "It ran" and "the tests passed" are not substitutes for reading. This rule caught CR-03 in the code review (AI described the wrong control flow in `app/routers/tasks.py`) and SEC-08 in the security review (AI flagged SQL injection on a project with no database).
+
+**Rule 2: Run the full test suite after every AI-assisted change.**
+
+After any AI-generated code is integrated, `pytest tests/ -v` must pass before the change is committed. Tests verify behavior, not just syntax. This rule was applied after every change to `app/storage.py`, `app/models.py`, and `app/routers/tasks.py`.
+
+**Rule 3: Never accept AI output that contains something I cannot explain.**
+
+If AI output adds an import, pattern, or behavior I cannot explain from memory, I either research it fully before accepting or rewrite the output without it. The rejected regex search (`re.compile` + `re.IGNORECASE` + `re.escape`) was replaced with `q_lower in text.lower()` because the simpler form is self-documenting and I can own every character of it. AI tools do not own the code — I do.
+
+---
+
+## Ownership Statement
+
+Every file in this repository falls into one of three categories:
+
+### Written by me, no AI involvement
+
+- `app/models.py` — AI generated validator drafts; the field structure, types, and choices are mine.
+- `app/storage.py` — The search filter was AI-generated, rejected, and rewritten by me (see section 4 above).
+- `tests/test_tasks.py` — All test cases were reviewed and run locally. The tag-preservation test (`test_patch_unrelated_update_preserves_tags`) was written by me to close a gap the AI did not propose.
+
+### AI-generated and accepted verbatim after review
+
+- `Dockerfile` — reviewed line by line; built and verified locally.
+- `.github/workflows/ci.yml` — reviewed; `needs: test` dependency confirmed.
+- `docker-compose.yml` — reviewed; health check dependency confirmed.
+
+### AI-generated and modified before committing
+
+- `Dockerfile` (first draft) — removed a `COPY .env.example .env` line that would have baked configuration into the image.
+- `app/storage.py` search filter — regex implementation rejected; replaced with plain string containment.
+
+I can explain any line in any file in this repository. The test suite passes. The Docker image builds and the container health check passes. All AI interactions are logged in `AGENTS.md` and in this document.
