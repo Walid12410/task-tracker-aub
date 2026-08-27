@@ -16,35 +16,63 @@ All tests pass. Command:
 pytest tests/ -v
 ```
 
-Expected output:
+Output (run 2026-08-27):
 
 ```
-tests/test_tasks.py::test_create_task PASSED
-tests/test_tasks.py::test_create_task_missing_title PASSED
-tests/test_tasks.py::test_create_task_empty_title PASSED
-tests/test_tasks.py::test_get_task PASSED
-tests/test_tasks.py::test_get_task_not_found PASSED
-tests/test_tasks.py::test_list_tasks PASSED
-tests/test_tasks.py::test_filter_by_status PASSED
-tests/test_tasks.py::test_filter_by_priority PASSED
-tests/test_tasks.py::test_filter_by_q PASSED
-tests/test_tasks.py::test_filter_by_tag PASSED
-tests/test_tasks.py::test_filter_by_assignee PASSED
-tests/test_tasks.py::test_patch_task_status PASSED
-tests/test_tasks.py::test_patch_invalid_transition PASSED
-tests/test_tasks.py::test_patch_task_tags PASSED
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.3.2, pluggy-1.6.0
+rootdir: /Users/macuser/Desktop/aub course/task-tracker-api
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 40 items
+
+tests/test_tasks.py::test_create_task_valid_returns_201_with_full_body PASSED
+tests/test_tasks.py::test_create_task_missing_title_returns_422 PASSED
+tests/test_tasks.py::test_create_task_blank_title_returns_422 PASSED
+tests/test_tasks.py::test_create_task_invalid_priority_returns_422 PASSED
+tests/test_tasks.py::test_create_task_unknown_field_returns_422 PASSED
+tests/test_tasks.py::test_list_tasks_empty_returns_200_and_empty_list PASSED
+tests/test_tasks.py::test_list_tasks_filter_by_status_no_match_returns_200_and_empty_list PASSED
+tests/test_tasks.py::test_list_tasks_filter_by_priority_returns_only_matches PASSED
+tests/test_tasks.py::test_get_task_by_id_returns_task PASSED
+tests/test_tasks.py::test_get_task_by_id_not_found_returns_404_with_detail PASSED
+tests/test_tasks.py::test_patch_partial_update_keeps_other_fields PASSED
+tests/test_tasks.py::test_patch_not_found_returns_404 PASSED
+tests/test_tasks.py::test_patch_valid_transition_todo_to_inprogress_returns_200 PASSED
+tests/test_tasks.py::test_patch_invalid_transition_todo_to_done_returns_422 PASSED
+tests/test_tasks.py::test_patch_same_status_returns_422 PASSED
+tests/test_tasks.py::test_patch_valid_transition_inprogress_to_done_returns_200 PASSED
+tests/test_tasks.py::test_patch_valid_transition_done_to_inprogress_returns_200 PASSED
+tests/test_tasks.py::test_patch_whitespace_only_title_returns_422 PASSED
+tests/test_tasks.py::test_patch_invalid_priority_value_returns_422 PASSED
+tests/test_tasks.py::test_patch_empty_body_returns_200_with_fields_unchanged PASSED
+tests/test_tasks.py::test_patch_unknown_field_returns_422 PASSED
+tests/test_tasks.py::test_delete_existing_returns_204_no_body PASSED
+tests/test_tasks.py::test_delete_missing_returns_404 PASSED
+tests/test_tasks.py::test_create_task_with_tags_returns_201_and_tags_in_response PASSED
+tests/test_tasks.py::test_create_task_with_empty_string_tag_returns_422 PASSED
+tests/test_tasks.py::test_create_task_with_whitespace_only_tag_returns_422 PASSED
+tests/test_tasks.py::test_create_task_with_too_many_tags_returns_422 PASSED
+tests/test_tasks.py::test_create_task_with_no_tags_defaults_to_empty_list PASSED
+tests/test_tasks.py::test_patch_task_tags_preserves_other_fields PASSED
 tests/test_tasks.py::test_patch_task_tags_can_be_cleared PASSED
 tests/test_tasks.py::test_patch_unrelated_update_preserves_tags PASSED
-tests/test_tasks.py::test_delete_task PASSED
-tests/test_tasks.py::test_delete_task_not_found PASSED
-tests/test_tasks.py::test_health PASSED
+tests/test_tasks.py::test_list_tasks_filter_by_tag_returns_only_matching PASSED
+tests/test_tasks.py::test_list_tasks_filter_by_tag_no_match_returns_empty_list PASSED
+tests/test_tasks.py::test_list_tasks_filter_by_tag_is_case_insensitive PASSED
+tests/test_tasks.py::test_list_tasks_search_by_title_returns_matching PASSED
+tests/test_tasks.py::test_list_tasks_search_by_description_returns_matching PASSED
+tests/test_tasks.py::test_list_tasks_search_is_case_insensitive PASSED
+tests/test_tasks.py::test_list_tasks_search_no_match_returns_200_empty_list PASSED
+tests/test_tasks.py::test_list_tasks_combined_search_and_status_filter PASSED
+tests/test_tasks.py::test_list_tasks_combined_tag_and_priority_filter PASSED
 
-19 passed in 0.42s
+============================== 40 passed in 0.09s ==============================
 ```
 
-**Coverage:** All five CRUD routes, all five filter parameters (`status`, `priority`, `q`, `tag`, `assignee`), valid and invalid status transitions, tag operations (set, clear, preserve), and the `/health` endpoint.
+**Coverage:** All five CRUD routes; all filter parameters (`status`, `priority`, `q`, `tag`); valid and invalid status transitions (including same-status and skip-step); tag operations (set, clear, preserve on unrelated patch); combined multi-filter queries; and strict validation (blank title, unknown fields, invalid enum values, tag constraints).
 
-Test isolation: the `_reset_storage` autouse fixture in `tests/conftest.py` resets the in-memory store before and after every test so tests are fully order-independent.
+Test isolation: the `_reset_storage` autouse fixture in `tests/conftest.py` resets the in-memory store before every test so tests are fully order-independent.
 
 ---
 
@@ -77,7 +105,7 @@ Trigger: every push to any branch.
 
 | Job | What runs | Pass condition |
 |-----|-----------|----------------|
-| `test` | `pytest tests/ -v` on Python 3.11 | All 19 tests pass |
+| `test` | `pytest tests/ -v` on Python 3.11 | All 40 tests pass |
 | `docker` | `docker build`, start container, `curl --fail http://localhost:8000/health` | HTTP 200 from health endpoint |
 
 The `docker` job declares `needs: test`, so it only runs after the test job succeeds. A test failure prevents the Docker build from running.
