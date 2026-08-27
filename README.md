@@ -18,8 +18,7 @@ task-tracker-api/
 │   ├── conftest.py        # Shared fixtures (TestClient, storage reset)
 │   └── test_tasks.py      # Full route coverage (CRUD + tags + search)
 ├── docs/
-│   ├── midcourse/         # Mid-course design docs
-│   └── final/             # Final-project docs (ADR, security, reflection)
+│    # Final-project docs (ADR, security, reflection)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .github/workflows/ci.yml
@@ -149,3 +148,16 @@ All AI tool usage is documented in `AGENTS.md`. Every AI-generated output was re
 - CORS is hard-coded to `http://localhost:5500`. Change `allow_origins` in `app/main.py` for other environments.
 - No rate limiting.
 - `description` field has no server-side length cap (only `title` is length-validated).
+
+## Final Project
+
+The final-project hardening phase added containerization, CI, security documentation, and AI governance on top of the working mid-course API. No new product features were added; the goal was operational completeness.
+
+| Deliverable | Location |
+|-------------|----------|
+| Release evidence (tests, Docker, CI) | `docs/release-evidence.md` |
+| AI code review and security mini-log | `docs/final-ai-review.md` |
+| AI governance playbook | `docs/ai-playbook.md` |
+| AI governance log | `AGENTS.md` |
+
+All AI-generated content was reviewed line-by-line and tested before commit. The rejected regex search implementation is documented as the canonical rejected-output example in `docs/final-ai-review.md`.
